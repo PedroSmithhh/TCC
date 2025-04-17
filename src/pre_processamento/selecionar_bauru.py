@@ -7,7 +7,6 @@ def seleciona_bauru(df):
     df_bauru = pd.DataFrame(df)
     df_bauru = df_bauru[df_bauru["municipio"] == "BAURU"]
     return df_bauru
-    
 
 # Função para detectar a codificação de um arquivo
 def detectar_encoding(arquivo_path):
@@ -29,11 +28,9 @@ def detecta_separador(caminho, encoding):
 
 # Função para ler arquivos na codificação certa
 def leitura_csv(caminho):
-    # Detecta a codificação do arquivo
     encoding_original = detectar_encoding(caminho)
     separador = detecta_separador(caminho, encoding_original)
     return pd.read_csv(caminho, encoding=encoding_original, sep=separador)
-        
 
 # Chegar na raiz do projeto
 raiz_projeto = Path(__file__).parent.parent.parent
