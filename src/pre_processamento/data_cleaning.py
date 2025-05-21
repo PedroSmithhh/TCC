@@ -6,7 +6,7 @@ raiz_projeto = Path(__file__).parent.parent.parent
 caminho_data = raiz_projeto / "data"
 
 # Carregar os datasets
-sinistros = pd.read_csv(caminho_data / "sinistros_2022-2025_bauru.csv", sep=";", decimal=",")
+sinistros = pd.read_csv(caminho_data / "sinistros_2022-2025_bauru.csv", sep=";")
 pessoas = pd.read_csv(caminho_data / "pessoas_2022-2025_bauru.csv", sep=";")
 veiculos = pd.read_csv(caminho_data / "veiculos_2022-2025_bauru.csv", sep=";")
 
@@ -25,26 +25,12 @@ def padronizar_nao_disponivel(df):
 sinistros['numero_logradouro'] = sinistros['numero_logradouro'].fillna("S/N")
 sinistros['hora_sinistro'] = sinistros['hora_sinistro'].fillna("99:99")
 sinistros['logradouro'] = sinistros['logradouro'].fillna("NAO DISPONIVEL")
-
-# Substituir vírgulas por pontos nas colunas latitude e longitude
 sinistros['latitude'] = sinistros['latitude'].fillna(-9999)
 sinistros['longitude'] = sinistros['longitude'].fillna(-9999)
 
-sinistros['latitude'] = sinistros['latitude'].astype(str)
-sinistros['longitude'] = sinistros['longitude'].astype(str)
-
-sinistros['latitude'] = sinistros['latitude'].str.replace(',', '.', regex=False)
-sinistros['longitude'] = sinistros['longitude'].str.replace(',', '.', regex=False)
-
-sinistros['latitude'] = sinistros['latitude'].fillna('-9999')
-sinistros['longitude'] = sinistros['longitude'].fillna('-9999')
-
-sinistros['latitude'] = pd.to_numeric(sinistros['latitude'])
-sinistros['longitude'] = pd.to_numeric(sinistros['longitude'])
-
 # Tratar colunas tp_veiculo_* e gravidade_* (valores vazios = 0, pois indicam ausência)
 for col in [col for col in sinistros.columns if col.startswith('tp_veiculo_') or col.startswith('gravidade_')]:
-    sinistros[col] = sinistros[col].fillna(0).astype(int)
+    sinistros[col] = sinistros[col].fillna(0).astype(float).astype(int)
 
 # Tratar colunas tp_sinistro_* (valores vazios = "N" para indicar não aplicável)
 for col in [col for col in sinistros.columns if col.startswith('tp_sinistro_')]:
