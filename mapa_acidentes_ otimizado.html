@@ -101,12 +101,14 @@
             tile_layer_4de791825bd11f288ea03f18553fbc9d.addTo(map_27ca78e5e01bf6b9c1e15f49dba9e071);
         
     
-            var marker_cluster_66cad0ae0c8ad595e8ffa3c445ba1bfa = L.markerClusterGroup(
-                {
-}
-            );
-        
-    
+            var marker_cluster_66cad0ae0c8ad595e8ffa3c445ba1bfa = L.markerClusterGroup({
+                spiderfyOnEveryZoom: true,
+                showCoverageOnHover: true,
+                zoomToBoundsOnClick: true,
+                disableClusteringAtZoom: 17,
+                maxClusterRadius: 50
+});
+
             var marker_b09829f5ba4aaf9adffc8570e203aa18 = L.marker(
                 [-22.31817024, -49.11414784],
                 {
