@@ -33,8 +33,8 @@ caminho_data_bruto = raiz_projeto / "data_bruto"
 caminho_data = raiz_projeto / "data"
 
 # Leitura dos arquivos
-df_veiculos_2022 = leitura_csv(caminho_data_bruto / "veiculos_2022-2025.csv")
-df_pessoas_2022 = leitura_csv(caminho_data / "pessoas_2022-2025_bauru.csv")
+df_veiculos_2022 = leitura_csv(caminho_data_bruto / "Acidentes" / "veiculos_2022-2025.csv")
+df_pessoas_2022 = leitura_csv(caminho_data / "Acidentes" / "pessoas_2022-2025_bauru.csv")
 
 # Filtra pelo ID_veiculos = ID_pessoas
 df_veiculos_bauru = df_veiculos_2022[df_veiculos_2022['id_sinistro'].isin(df_pessoas_2022['id_sinistro'])]

@@ -38,8 +38,8 @@ caminho_data_bruto = raiz_projeto / "data_bruto"
 caminho_data = raiz_projeto / "data"
 
 # Leitura dos arquivos
-df_sinistros_2022_r = leitura_csv(caminho_data_bruto / "sinistros_2022-2025.csv")
-df_pessoas_2022_r = leitura_csv(caminho_data_bruto / "pessoas_2022-2025.csv")
+df_sinistros_2022_r = leitura_csv(caminho_data_bruto / "Acidentes" / "sinistros_2022-2025.csv")
+df_pessoas_2022_r = leitura_csv(caminho_data_bruto / "Acidentes" / "pessoas_2022-2025.csv")
 
 df_sinistros_2022 = seleciona_bauru(df_sinistros_2022_r)
 df_pessoas_2022 = seleciona_bauru(df_pessoas_2022_r)
