@@ -2,6 +2,12 @@ import pandas as pd
 from pathlib import Path
 import chardet
 
+# Função para filtrar a cidade de bauru
+def seleciona_bauru(df):
+    df_bauru = pd.DataFrame(df)
+    df_bauru = df_bauru[df_bauru["municipio"] == "BAURU"]
+    return df_bauru
+
 # Função para detectar a codificação de um arquivo
 def detectar_encoding(arquivo_path):
     with open(arquivo_path, 'rb') as file:
@@ -22,22 +28,21 @@ def detecta_separador(caminho, encoding):
 
 # Função para ler arquivos na codificação certa
 def leitura_csv(caminho):
-    # Detecta a codificação do arquivo
     encoding_original = detectar_encoding(caminho)
     separador = detecta_separador(caminho, encoding_original)
     return pd.read_csv(caminho, encoding=encoding_original, sep=separador)
-        
+
 # Chegar na raiz do projeto
 raiz_projeto = Path(__file__).parent.parent.parent
 caminho_data_bruto = raiz_projeto / "data_bruto"
 caminho_data = raiz_projeto / "data"
 
 # Leitura dos arquivos
-df_veiculos_2022 = leitura_csv(caminho_data_bruto / "Acidentes" / "veiculos_2022-2025.csv")
-df_pessoas_2022 = leitura_csv(caminho_data / "Acidentes" / "pessoas_2022-2025_bauru.csv")
+df_sinistros_2022_r = leitura_csv(caminho_data_bruto / "Acidentes" / "sinistros_2022-2025.csv")
+df_pessoas_2022_r = leitura_csv(caminho_data_bruto / "Acidentes" / "pessoas_2022-2025.csv")
 
-# Filtra pelo ID_veiculos = ID_pessoas
-df_veiculos_bauru = df_veiculos_2022[df_veiculos_2022['id_sinistro'].isin(df_pessoas_2022['id_sinistro'])]
+df_sinistros_2022 = seleciona_bauru(df_sinistros_2022_r)
+df_pessoas_2022 = seleciona_bauru(df_pessoas_2022_r)
 
-# Salva o novo csv
-df_veiculos_bauru.to_csv(caminho_data / "veiculos_2022-2025_bauru.csv", index=False, encoding="utf-8", sep=";")
+df_sinistros_2022.to_csv(caminho_data / "Acidentes" / "sinistros_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
+df_pessoas_2022.to_csv(caminho_data / "Acidentes" / "pessoas_2022-2025_bauru.csv", index=False, encoding="utf-8", sep=";")

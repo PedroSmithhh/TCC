@@ -6,9 +6,9 @@ raiz_projeto = Path(__file__).parent.parent.parent
 caminho_data = raiz_projeto / "data"
 
 # Carregar os datasets
-sinistros = pd.read_csv(caminho_data / "sinistros_2022-2025_bauru.csv", sep=";")
-pessoas = pd.read_csv(caminho_data / "pessoas_2022-2025_bauru.csv", sep=";")
-veiculos = pd.read_csv(caminho_data / "veiculos_2022-2025_bauru.csv", sep=";")
+sinistros = pd.read_csv(caminho_data / "Acidentes" / "sinistros_2022-2025_bauru.csv", sep=";")
+pessoas = pd.read_csv(caminho_data / "Acidentes" / "pessoas_2022-2025_bauru.csv", sep=";")
+veiculos = pd.read_csv(caminho_data / "Acidentes" / "veiculos_2022-2025_bauru.csv", sep=";")
 
 # Ajuste do nome da coluna tipo_vitima
 pessoas = pessoas.rename(columns={'tipo_de vítima': 'tipo_vitima'})
@@ -78,9 +78,9 @@ veiculos = padronizar_nao_disponivel(veiculos)
 
 # Salvar os datasets limpos
 try:
-    sinistros.to_csv(caminho_data / "sinistros_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
-    pessoas.to_csv(caminho_data / "pessoas_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
-    veiculos.to_csv(caminho_data / "veiculos_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
+    sinistros.to_csv(caminho_data / "Acidentes" / "sinistros_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
+    pessoas.to_csv(caminho_data / "Acidentes" / "pessoas_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
+    veiculos.to_csv(caminho_data / "Acidentes" / "veiculos_2022-2025_bauru.csv", index=False, encoding="utf-8-sig", sep=";")
     print("Limpeza concluída! Arquivos salvos com sucesso.")
 except PermissionError:
     print("Erro de permissão ao salvar os arquivos. Tente salvar em outro diretório ou execute como administrador.")

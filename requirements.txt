@@ -1,2 +1,7 @@
 pandas
 chardet
+openpyxl
+matplotlib.pyplot
+seaborn
+numpy
+folium
