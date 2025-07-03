@@ -7,7 +7,14 @@ from datetime import datetime, timedelta
 # Função para ler arquivos Excel e converter para CSV
 def converte_excel_para_csv(caminho_entrada, caminho_saida):
     # Lê o arquivo Excel
-    df = pd.read_excel(caminho_entrada)
+    df = pd.read_excel(caminho_entrada, decimal=',', thousands='.')
+
+    df['PRECIPITAÇÃO TOTAL, HORÁRIO (mm)'] = (
+    df['PRECIPITAÇÃO TOTAL, HORÁRIO (mm)']
+    .astype(str)
+    .str.replace(',', '.', regex=False)
+    .astype(float)
+)
     
     # Converte para CSV
     df.to_csv(caminho_saida, index=False, encoding='utf-8-sig', sep=';')
@@ -55,18 +62,25 @@ chuva_2023 = caminho_data/ "Chuva" / "chuva_bauru_2023.csv"
 chuva_2024 = caminho_data / "Chuva" / "chuva_bauru_2024.csv"
 chuva_2025 = caminho_data / "Chuva" / "chuva_bauru_2025.csv"
 chuva_2022_2025 = caminho_data / "Chuva" / "chuva_bauru_2022-2025.csv"
+chuva_2022_2025_teste = caminho_data / "Chuva" / "chuva_bauru_2022-2025_teste.csv"
 
 lista_df = []
 
 # Concatenar os datasets
 chuva_files = [chuva_2022, chuva_2023 , chuva_2024 , chuva_2025]
 for f in chuva_files:
-    df = pd.read_csv(f, sep=";")
+    df = pd.read_csv(f, sep=";", # converte a coluna de precipitação diretamente para float
+        converters={
+            'PRECIPITAÇÃO TOTAL, HORÁRIO (mm)': 
+                lambda x: float(x.replace(',', '.')) if isinstance(x, str) and x.strip() else 0.0
+        },)
     df['Data'] = pd.to_datetime(df['Data']).dt.strftime('%d/%m/%Y')  # força formato brasileiro
     df['Hora UTC'] = df['Hora UTC'].astype(str)
     lista_df.append(df)
 
 chuva = pd.concat(lista_df, ignore_index=True)
+
+chuva.to_csv(chuva_2022_2025_teste, index=False, encoding="utf-8-sig", sep=";")
 
 # Renomeia a coluna
 chuva = chuva.rename(columns={'Hora UTC': 'hora'})
@@ -84,7 +98,7 @@ chuva['datetime_brt'] = chuva['datetime_utc'] - pd.Timedelta(hours=3)
 
 # Atualiza as colunas Data e hora no formato desejado
 chuva['Data'] = chuva['datetime_brt'].dt.strftime('%d/%m/%Y')
-chuva['hora'] = chuva['datetime_brt'].dt.strftime('%H:%M:%S')
+chuva['hora'] = chuva['datetime_brt'].dt.strftime('%H:%M')
 
 # Remove colunas intermediárias e salva o CSV
 chuva = chuva.drop(columns=['datetime_utc', 'datetime_brt'])
