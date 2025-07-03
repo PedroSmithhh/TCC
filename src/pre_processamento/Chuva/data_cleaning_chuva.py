@@ -56,14 +56,38 @@ chuva_2024 = caminho_data / "Chuva" / "chuva_bauru_2024.csv"
 chuva_2025 = caminho_data / "Chuva" / "chuva_bauru_2025.csv"
 chuva_2022_2025 = caminho_data / "Chuva" / "chuva_bauru_2022-2025.csv"
 
+lista_df = []
+
 # Concatenar os datasets
 chuva_files = [chuva_2022, chuva_2023 , chuva_2024 , chuva_2025]
-chuva = pd.concat([pd.read_csv(f, sep=";") for f in chuva_files], ignore_index=True)
+for f in chuva_files:
+    df = pd.read_csv(f, sep=";")
+    df['Data'] = pd.to_datetime(df['Data']).dt.strftime('%d/%m/%Y')  # força formato brasileiro
+    df['Hora UTC'] = df['Hora UTC'].astype(str)
+    lista_df.append(df)
+
+chuva = pd.concat(lista_df, ignore_index=True)
 
 # Renomeia a coluna
 chuva = chuva.rename(columns={'Hora UTC': 'hora'})
 
-# Aplica a conversão na coluna
-chuva['hora'] = chuva['hora'].apply(converter_utc_para_bauru)
+# Monta um datetime em UTC a partir de Data + hora
+#    - remove o " UTC" de 'hora'
+#    - combina Data e hora num formato reconhecido por pandas
+chuva['datetime_utc'] = pd.to_datetime(
+    chuva['Data'] + ' ' + chuva['hora'].str.replace(' UTC', ''),
+    format='%d/%m/%Y %H%M'
+)
 
+# Converte para UTC−3 (Bauru) subtraindo 3 horas
+chuva['datetime_brt'] = chuva['datetime_utc'] - pd.Timedelta(hours=3)
+
+# Atualiza as colunas Data e hora no formato desejado
+chuva['Data'] = chuva['datetime_brt'].dt.strftime('%d/%m/%Y')
+chuva['hora'] = chuva['datetime_brt'].dt.strftime('%H:%M:%S')
+
+# Remove colunas intermediárias e salva o CSV
+chuva = chuva.drop(columns=['datetime_utc', 'datetime_brt'])
+
+# Salva o csv
 chuva.to_csv(chuva_2022_2025, index=False, encoding="utf-8-sig", sep=";")
