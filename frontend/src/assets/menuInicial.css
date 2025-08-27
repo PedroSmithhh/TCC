@@ -1,0 +1,33 @@
+.menu-inicial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #111;
+  color: white;
+  text-align: center;
+}
+
+.menu-inicial h1 {
+  margin-bottom: 20px;
+}
+
+.menu-inicial ul {
+  list-style: none;
+  padding: 0;
+}
+
+.menu-inicial li {
+  margin: 15px 0;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 10px 20px;
+  border: 1px solid white;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
+
+.menu-inicial li:hover {
+  background: #444;
+}
