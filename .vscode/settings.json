@@ -1,0 +1,38 @@
+{
+    // --- Configurações Essenciais ---
+    
+    // Define o interpretador Python padrão para o projeto.
+    // Se você criou um .venv, o caminho seria algo como: "${workspaceFolder}/.venv/bin/python"
+    "python.defaultInterpreterPath": "/usr/bin/python3", // (Ajuste para o caminho do seu interpretador se souber)
+
+    // Impede a busca automática por ambientes em todo o projeto
+    "python.pythonPath": "${workspaceFolder}", // Limita a busca à raiz
+
+    // --- Exclusões de Performance (A PARTE MAIS IMPORTANTE) ---
+
+    // Exclui pastas da análise de código da extensão Python
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/data_bruto",
+        "**/data",
+        "**/.git"
+    ],
+
+    // Exclui pastas do monitoramento de arquivos do VS Code
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true
+    },
+    
+    // Impede a busca por arquivos em pastas pesadas
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/*.code-search": true,
+        "**/data_bruto": true,
+        "**/data": true
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
+}

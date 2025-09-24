@@ -1,7 +1,7 @@
 pandas
 chardet
 openpyxl
-matplotlib.pyplot
+matplotlib
 seaborn
 numpy
 folium
