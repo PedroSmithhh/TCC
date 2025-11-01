@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +17,7 @@ from sklearn.preprocessing import MinMaxScaler
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 src_path = Path(__file__).parent.parent
-model_path = src_path / "model" / "modelo_risco_viario.pkl"
+model_path = src_path / "model" / "modelo_risco_viario2.pkl"
 
 app = FastAPI(
     title="API de Risco Viário",
@@ -24,17 +25,47 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ou ['http://localhost:8080'] para ser mais seguro
+    allow_credentials=True,
+    allow_methods=["*"],  # inclui OPTIONS, GET, POST etc
+    allow_headers=["*"],
+)
+
 # ============================
 # CARREGAMENTO DO MODELO
 # ============================
 try:
     model = joblib.load(model_path)
-    model_features = model.get_booster().feature_names
-    logging.info(f"Modelo carregado com sucesso ({len(model_features)} features).")
+
+    model_features = []  # valor padrão
+
+    # Se o modelo for um pipeline, tenta acessar o estimador final (ex: XGBClassifier)
+    if hasattr(model, "named_steps"):
+        for name, step in model.named_steps.items():
+            if hasattr(step, "get_booster"):
+                booster = step.get_booster()
+                model_features = booster.feature_names or []
+                break
+
+        logging.info(f"Modelo carregado (Pipeline, {len(model_features)} features detectadas).")
+
+    # Se for um XGBoost puro
+    elif hasattr(model, "get_booster"):
+        booster = model.get_booster()
+        model_features = booster.feature_names or []
+        logging.info(f"Modelo XGBoost carregado ({len(model_features)} features).")
+
+    else:
+        logging.info("Modelo carregado (outro tipo, sem feature_names).")
+
 except Exception as e:
     logging.error(f"Falha ao carregar modelo: {e}")
     model = None
     model_features = []
+
+
 
 # ============================
 # SCHEMA DE ENTRADA
@@ -59,7 +90,7 @@ class InputFeatures(BaseModel):
 # ============================
 def preprocess_input(df: pd.DataFrame) -> pd.DataFrame:
     try:
-        # 1️⃣ Substitui vírgula por ponto e tenta converter para float
+        # Substitui vírgula por ponto e tenta converter para float
         for col in df.columns:
             if df[col].dtype == 'object':
                 df[col] = df[col].str.replace(',', '.', regex=False)
@@ -68,23 +99,23 @@ def preprocess_input(df: pd.DataFrame) -> pd.DataFrame:
                 except:
                     pass
 
-        # 2️⃣ Remove coordenadas inválidas
+        # Remove coordenadas inválidas
         df.loc[df['latitude'] <= -90, 'latitude'] = np.nan
         df.loc[df['longitude'] <= -180, 'longitude'] = np.nan
         df = df[df['latitude'].notna() & df['longitude'].notna()]
 
-        # 3️⃣ Cria GeoDataFrame e projeta para UTM (Bauru — zona 23S)
+        # Cria GeoDataFrame e projeta para UTM (Bauru — zona 23S)
         gdf = gpd.GeoDataFrame(
             df,
             geometry=gpd.points_from_xy(df.longitude, df.latitude),
             crs="EPSG:4326"
         ).to_crs("EPSG:32723")
 
-        # 4️⃣ Extrai coordenadas X/Y em metros
+        # Extrai coordenadas X/Y em metros
         df['x_coord'] = gdf.geometry.x
         df['y_coord'] = gdf.geometry.y
 
-        # 5️⃣ Normaliza com MinMaxScaler
+        # Normaliza com MinMaxScaler
         scaler = MinMaxScaler()
         df[['x_coord', 'y_coord']] = scaler.fit_transform(df[['x_coord', 'y_coord']])
 
@@ -134,7 +165,9 @@ async def calcular_risco(features: InputFeatures):
         df_processed = preprocess_input(df_input)
 
         # Ajusta as colunas para o modelo
-        df_processed = df_processed.reindex(columns=model_features, fill_value=0)
+        if model_features:
+            df_processed = df_processed.reindex(columns=model_features, fill_value=0)
+
 
         # Realiza a predição
         prob = model.predict_proba(df_processed)[:, 1]
