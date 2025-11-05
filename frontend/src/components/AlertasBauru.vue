@@ -127,30 +127,16 @@ export default {
 
     async consultarRisco(lat, lng) {
       try {
-        // Cria payload dinâmico
+        // Cria payload simplificado que a nossa nova API espera
         const payload = {
-          latitude: lat.toString().replace(".", ","),
-          longitude: lng.toString().replace(".", ","),
-          data: new Date().toISOString().split("T")[0],
-          hora: new Date().getHours(),
-          chuva: 0,
-          tipo_via_num: 1,
-          tp_veiculo_bicicleta: 0,
-          tp_veiculo_caminhao: 0,
-          tp_veiculo_motocicleta: 0,
-          tp_veiculo_nao_disponivel: 0,
-          tp_veiculo_onibus: 0,
-          tp_veiculo_outros: 0,
-          tp_veiculo_automovel: 0
+          latitude: lat, // Envia como NÚMERO
+          longitude: lng, // Envia como NÚMERO
+          tp_veiculo_selecionado: this.tipoSelecionado // Envia a STRING da chave do veículo
         }
-
-        // Ativa o tipo selecionado
-        if (this.tipoSelecionado) payload[this.tipoSelecionado] = 1
-
         const res = await fetch(this.apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload) // Envia o novo payload simplificado
         })
 
         if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
@@ -158,6 +144,7 @@ export default {
         const data = await res.json()
         this.risco = data.risco_estimado
         this.exibirRiscoNoMapa(this.risco, data.interpretacao)
+      
       } catch (error) {
         console.error("Erro ao consultar risco:", error)
       }

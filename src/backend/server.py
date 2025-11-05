@@ -4,20 +4,16 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
-import geopandas as gpd
 import numpy as np
 import joblib
 import traceback
 import logging
-from sklearn.preprocessing import MinMaxScaler
 
-# ============================
 # CONFIGURAÇÕES E LOGS
-# ============================
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 src_path = Path(__file__).parent.parent
-model_path = src_path / "model" / "modelo_risco_viario2.pkl"
+model_path = src_path / "model" / "modelo_risco_viario.pkl"
 
 app = FastAPI(
     title="API de Risco Viário",
@@ -33,9 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================
 # CARREGAMENTO DO MODELO
-# ============================
 try:
     model = joblib.load(model_path)
 
@@ -66,69 +60,14 @@ except Exception as e:
     model_features = []
 
 
-
-# ============================
 # SCHEMA DE ENTRADA
-# ============================
 class InputFeatures(BaseModel):
-    latitude: str = Field(..., description="Latitude (pode conter vírgula)")
-    longitude: str = Field(..., description="Longitude (pode conter vírgula)")
-    data: str = Field(..., description="Data no formato YYYY-MM-DD")
-    hora: int = Field(..., ge=0, le=23)
-    chuva: int = Field(..., ge=0, le=1)
-    tipo_via_num: int = Field(..., ge=0)
-    tp_veiculo_bicicleta: int = Field(..., ge=0)
-    tp_veiculo_caminhao: int = Field(..., ge=0)
-    tp_veiculo_motocicleta: int = Field(..., ge=0)
-    tp_veiculo_nao_disponivel: int = Field(..., ge=0)
-    tp_veiculo_onibus: int = Field(..., ge=0)
-    tp_veiculo_outros: int = Field(..., ge=0)
-    tp_veiculo_automovel: int = Field(..., ge=0)
+    latitude: float
+    longitude: float
+    tp_veiculo_selecionado: str = Field(..., description="Tipo de veículo selecionado")
 
-# ============================
-# FUNÇÃO DE PRÉ-PROCESSAMENTO
-# ============================
-def preprocess_input(df: pd.DataFrame) -> pd.DataFrame:
-    try:
-        # Substitui vírgula por ponto e tenta converter para float
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].str.replace(',', '.', regex=False)
-                try:
-                    df[col] = df[col].astype(float)
-                except:
-                    pass
 
-        # Remove coordenadas inválidas
-        df.loc[df['latitude'] <= -90, 'latitude'] = np.nan
-        df.loc[df['longitude'] <= -180, 'longitude'] = np.nan
-        df = df[df['latitude'].notna() & df['longitude'].notna()]
-
-        # Cria GeoDataFrame e projeta para UTM (Bauru — zona 23S)
-        gdf = gpd.GeoDataFrame(
-            df,
-            geometry=gpd.points_from_xy(df.longitude, df.latitude),
-            crs="EPSG:4326"
-        ).to_crs("EPSG:32723")
-
-        # Extrai coordenadas X/Y em metros
-        df['x_coord'] = gdf.geometry.x
-        df['y_coord'] = gdf.geometry.y
-
-        # Normaliza com MinMaxScaler
-        scaler = MinMaxScaler()
-        df[['x_coord', 'y_coord']] = scaler.fit_transform(df[['x_coord', 'y_coord']])
-
-        return df
-
-    except Exception as e:
-        logging.error(f"Erro no pré-processamento: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Erro durante o pré-processamento dos dados.")
-
-# ============================
 # ENDPOINT PRINCIPAL
-# ============================
 @app.post("/calcular_risco")
 async def calcular_risco(features: InputFeatures):
     if model is None:
@@ -136,48 +75,63 @@ async def calcular_risco(features: InputFeatures):
 
     try:
         # Conversão e enriquecimento temporal
-        data = datetime.strptime(features.data, "%Y-%m-%d")
-        dia_semana = data.weekday()
-        mes = data.month
+        now = datetime.now()
+        dia_semana = now.weekday()
+        mes = now.month
         is_weekend = 1 if dia_semana >= 5 else 0
+        hora_int = now.hour
 
         # Criação do DataFrame inicial
-        df_input = pd.DataFrame([{
+        input_data = {
             "latitude": features.latitude,
             "longitude": features.longitude,
-            "data": features.data,
             "dia_semana": dia_semana,
             "mes": mes,
             "is_weekend": is_weekend,
-            "hora": features.hora,
-            "Chuva": features.chuva,
-            "tipo_via_num": features.tipo_via_num,
-            "tp_veiculo_bicicleta": features.tp_veiculo_bicicleta,
-            "tp_veiculo_caminhao": features.tp_veiculo_caminhao,
-            "tp_veiculo_motocicleta": features.tp_veiculo_motocicleta,
-            "tp_veiculo_nao_disponivel": features.tp_veiculo_nao_disponivel,
-            "tp_veiculo_onibus": features.tp_veiculo_onibus,
-            "tp_veiculo_outros": features.tp_veiculo_outros,
-            "tp_veiculo_automovel": features.tp_veiculo_automovel
-        }])
+            "hora": hora_int,
+            "Chuva": 0, # Valor padrão para teste
+            "tipo_via_num": 1, # Valor padrão para teste
+            "tp_veiculo_bicicleta": 0,
+            "tp_veiculo_caminhao": 0,
+            "tp_veiculo_motocicleta": 0,
+            "tp_veiculo_nao_disponivel": 0,
+            "tp_veiculo_onibus": 0,
+            "tp_veiculo_outros": 0,
+            "tp_veiculo_automovel": 0
+        }
 
-        # Aplica o mesmo pré-processamento do modelo
-        df_processed = preprocess_input(df_input)
+        # Ativa o veículo que o frontend enviou
+        if features.tp_veiculo_selecionado in input_data:
+            input_data[features.tp_veiculo_selecionado] = 1
 
-        # Ajusta as colunas para o modelo
-        if model_features:
-            df_processed = df_processed.reindex(columns=model_features, fill_value=0)
+        df_input = pd.DataFrame([input_data])
 
+        # Adiciona colunas que o modelo espera mas não vieram do input
+        for col in model_features:
+            if col not in df_input.columns:
+                df_input[col] = 0  # Adiciona a coluna com valor padrão 0
+
+        # Garante a ordem exata das colunas e remove extras
+        df_processed = df_input[model_features]
+        df_processed = df_processed.astype(float)
 
         # Realiza a predição
-        prob = model.predict_proba(df_processed)[:, 1]
+        prob = model.predict_proba(df_processed[model_features])[:, 1]
         risco = float(prob[0])
+
+        limiar = 0.45
+
+        if risco >= limiar:
+            interpretacao = "ALTO"
+        elif risco >= 0.2:
+            interpretacao = "MÉDIO"
+        else:
+            interpretacao = "BAIXO"
 
         return {
             "risco_estimado": risco,
-            "interpretacao": "ALTO" if risco >= 0.6 else "MÉDIO" if risco >= 0.3 else "BAIXO",
+            "interpretacao": interpretacao,
             "timestamp": datetime.now().isoformat(),
-            "entrada_processada": df_processed.to_dict(orient="records")[0]
         }
 
     except Exception as e:
@@ -185,7 +139,7 @@ async def calcular_risco(features: InputFeatures):
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 # ============================
-# HEALTHCHECK
+# HEALTHCHECK (sem alterações)
 # ============================
 @app.get("/healthcheck")
 def healthcheck():
