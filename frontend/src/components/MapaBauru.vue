@@ -1,5 +1,39 @@
 <template>
-  <div id="map" style="height: 100vh;"></div>
+  <div class="map-container">
+    
+    <div class="map-filters-overlay">
+      
+      <div class="filtro-grupo">
+        <strong>Período de Análise</strong>
+        <div class="filtro-item">
+          <label for="map-data-inicio">De:</label>
+          <input type="date" id="map-data-inicio" v-model="filtroDataInicio" :min="minData" :max="maxData">
+        </div>
+        <div class="filtro-item">
+          <label for="map-data-fim">Até:</label>
+          <input type="date" id="map-data-fim" v-model="filtroDataFim" :min="minData" :max="maxData">
+        </div>
+      </div>
+      
+      <div class="filtro-grupo">
+        <strong>Tipo de Visualização</strong>
+        <div class="filtro-item-radio">
+          <input type="radio" id="view-cluster" value="cluster" v-model="viewMode">
+          <label for="view-cluster">Agrupado (Cluster)</label>
+        </div>
+        <div class="filtro-item-radio">
+          <input type="radio" id="view-heatmap" value="heatmap" v-model="viewMode">
+          <label for="view-heatmap">Mapa de Calor</label>
+        </div>
+      </div>
+      
+      <div v-if="loading" class="filtro-loading">
+        Carregando dados...
+      </div>
+    </div>
+
+    <div id="map" style="height: 100vh; width: 100%;"></div>
+  </div>
 </template>
 
 <script>
@@ -7,65 +41,206 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Supercluster from 'supercluster';
 import { point } from '@turf/helpers';
+import "leaflet.heat"; 
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+  iconUrl: require('leaflet/dist/images/marker-icon.png'),
+  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
 
 export default {
   name: 'MapaBauru',
   data() {
     return {
       map: null,
-      clusterIndex: null, // O índice do supercluster
-      markersLayer: L.layerGroup(), // Uma camada só para os marcadores
-      pontosAcidentes: []
+      allPontosAcidentes: [], 
+      loading: true,
+      
+      // Filtros
+      viewMode: 'cluster',
+      filtroDataInicio: '',
+      filtroDataFim: '',
+      minData: '',
+      maxData: '',
+
+      // Camadas do Mapa
+      markersLayer: L.layerGroup(), 
+      heatmapLayer: null,
+      
+      // Índices
+      clusterIndex: null,
     };
   },
+
+  created() {
+    this.clusterIndex = new Supercluster({
+      radius: 60, 
+      maxZoom: 16, 
+      map: (props) => ({ ...props }),
+      
+      // Corrige o aviso do ESLint sobre variáveis não utilizadas
+      reduce: (/* eslint-disable no-unused-vars */ accumulated, props /* eslint-enable no-unused-vars */) => {
+
+      }
+    });
+  },
+
+
+  computed: {
+    filteredPontos() {
+      if (!this.filtroDataInicio || !this.filtroDataFim) {
+        return this.allPontosAcidentes;
+      }
+      
+      const inicio = new Date(this.filtroDataInicio + "T00:00:00");
+      const fim = new Date(this.filtroDataFim + "T23:59:59");
+      
+      return this.allPontosAcidentes.filter(ponto => {
+         const dataPonto = new Date(ponto.data_sinistro);
+         return dataPonto >= inicio && dataPonto <= fim;
+      });
+    }
+  },
+
+
+  watch: {
+    filteredPontos(novosPontos) {
+      if (this.map) {
+        this.buildDataLayers(novosPontos);
+      }
+    },
+    
+    viewMode() {
+      if (this.map) {
+        this.displayActiveLayer();
+      }
+    }
+  },
+
   mounted() {
     this.initMap();
-    this.loadDataAndSetupClusters();
+    this.loadData();
   },
+
   methods: {
     initMap() {
       this.map = L.map('map').setView([-22.3145, -49.0586], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(this.map);
+      
       this.markersLayer.addTo(this.map);
 
-      // Eventos que disparam a atualização dos clusters
-      this.map.on('moveend', this.updateMarkers);
+      // Evento de 'moveend' (zoom ou arrastar)
+      this.map.on('moveend', () => {
+        if (this.viewMode === 'cluster') {
+          this.updateMarkers();
+        }
+      });
     },
 
-    loadDataAndSetupClusters() {
-      fetch('/marcadores.json')
+    loadData() {
+      this.loading = true;
+      fetch('/coordenadas.json') 
         .then(res => res.json())
         .then(dados => {
-          // Formatar os dados para o padrão GeoJSON que o Supercluster entende
-          this.pontosAcidentes = dados.map(ponto => {
-            return point([ponto.lng, ponto.lat]);
-          });
-
-          // Inicializar o Supercluster
-          this.clusterIndex = new Supercluster({
-            radius: 100,       // Raio de agrupamento em pixels
-            maxZoom: 17,      // Nível máximo de zoom para continuar clusterizando
-            minZoom: 0
-          });
-          this.clusterIndex.load(this.pontosAcidentes); // Carrega os pontos
-
-          // Renderizar os marcadores pela primeira vez
-          this.updateMarkers();
-        })
-        .catch(err => {
-          console.error('Erro ao carregar os marcadores:', err);
+          
+          const pontosValidos = [];
+          for (const d of dados) {
+            const lat = parseFloat(d.latitude);
+            const lon = parseFloat(d.longitude);
+            const latValida = !isNaN(lat) && lat >= -90 && lat <= 90;
+            const lonValida = !isNaN(lon) && lon >= -180 && lon <= 180;
+            
+            if (d.data_sinistro && latValida && lonValida) {
+              pontosValidos.push({
+                data_sinistro: d.data_sinistro,
+                latitude: lat, 
+                longitude: lon
+              });
+            } 
+          }
+          
+          this.allPontosAcidentes = pontosValidos;
+          console.log(`Dados brutos: ${dados.length}, Pontos válidos: ${this.allPontosAcidentes.length}`);
+          
+          this.setupFiltrosDatas();
+          this.loading = false;
+          
+        }).catch(error => {
+          console.error("Erro ao carregar coordenadas.json:", error);
+          this.loading = false;
         });
     },
 
-    updateMarkers() {
-      if (!this.clusterIndex) return;
+    setupFiltrosDatas() {
+      if (this.allPontosAcidentes.length === 0) return;
 
+      const sorted = [...this.allPontosAcidentes].sort((a, b) => new Date(a.data_sinistro) - new Date(b.data_sinistro));
+      
+      const min = sorted[0].data_sinistro.split('T')[0];
+      const max = sorted[sorted.length - 1].data_sinistro.split('T')[0];
+
+      this.minData = min;
+      this.maxData = max;
+      this.filtroDataInicio = min;
+      this.filtroDataFim = max;
+    },
+
+    buildDataLayers(pontos) {
+      if (!this.map || !pontos) return;
+
+      // 1. Constrói o índice do Cluster
+      const features = pontos.map(ponto => {
+        return point([ponto.longitude, ponto.latitude], {
+          data_sinistro: ponto.data_sinistro 
+        });
+      });
+      this.clusterIndex.load(features);
+
+      // 2. Constrói a camada do Heatmap
+      const heatPoints = pontos.map(p => [p.latitude, p.longitude, 0.5]); 
+      
+      if (this.heatmapLayer && this.map.hasLayer(this.heatmapLayer)) {
+        this.map.removeLayer(this.heatmapLayer);
+      }
+      
+      // SOLUÇÃO OPACIDADE
+      this.heatmapLayer = L.heatLayer(heatPoints, {
+        radius: 20,
+        blur: 15,
+        maxZoom: 17,
+        maxOpacity: 0.4, // 60% opaco
+        minOpacity: 0.0, 
+        gradient: { 0.4: 'blue', 0.65: 'lime', 0.9: 'red' } 
+      });
+
+      // 3. Exibe a camada correta (cluster ou heatmap)
+      this.displayActiveLayer();
+    },
+
+    displayActiveLayer() {
+      this.markersLayer.clearLayers();
+      if (this.heatmapLayer && this.map.hasLayer(this.heatmapLayer)) {
+        this.map.removeLayer(this.heatmapLayer);
+      }
+
+      if (this.viewMode === 'cluster') {
+        this.updateMarkers();
+      } else if (this.viewMode === 'heatmap') {
+        this.map.addLayer(this.heatmapLayer);
+      }
+    },
+
+    updateMarkers() {
+      if (!this.clusterIndex || !this.map) return; 
+
+      this.markersLayer.clearLayers();
       const bounds = this.map.getBounds();
       const zoom = this.map.getZoom();
-
-      // 4. Pedir ao Supercluster os clusters/pontos para a visão atual do mapa
+      
       const clusters = this.clusterIndex.getClusters([
         bounds.getWest(),
         bounds.getSouth(),
@@ -73,52 +248,49 @@ export default {
         bounds.getNorth()
       ], zoom);
 
-      // Limpar os marcadores antigos e adicionar os novos
-      this.markersLayer.clearLayers();
+      for (const feature of clusters) {
+        const [longitude, latitude] = feature.geometry.coordinates;
+        const props = feature.properties;
+        
+        let marker;
+        let count;
+        const isCluster = props && props.cluster;
 
-      clusters.forEach(cluster => {
-        const [lng, lat] = cluster.geometry.coordinates;
-        const properties = cluster.properties;
-
-        // Se for um cluster (tem mais de 1 ponto)
-        if (properties.cluster) {
-          const pointCount = properties.point_count;
-          const icon = this.createClusterIcon(pointCount);
-          const marker = L.marker([lat, lng], { icon: icon });
-
-          // Adiciona evento para dar zoom ao clicar
-          marker.on('click', () => {
-            const expansionZoom = this.clusterIndex.getClusterExpansionZoom(properties.cluster_id);
-            this.map.setView([lat, lng], expansionZoom);
-          });
-
-          this.markersLayer.addLayer(marker);
-
+        if (isCluster) {
+          // É um cluster (count >= 2)
+          count = props.point_count;
         } else {
-          // Se for um ponto único (acidente individual)
-          // Renderizamos como um cluster de tamanho 1, como você queria.
-          const icon = this.createClusterIcon(1);
-          const marker = L.marker([lat, lng], { icon: icon });
-          this.markersLayer.addLayer(marker);
+          // É um ponto individual (count = 1)
+          count = 1;
         }
-      });
+
+        // 1. Criar o ícone de cluster para TODOS (seja 1 ou 50)
+        const icon = this.createClusterIcon(count);
+        marker = L.marker([latitude, longitude], { icon: icon });
+
+        // 2. Adicionar lógica de clique SOMENTE se for um cluster real (count > 1)
+        if (isCluster) {
+          marker.on('click', () => {
+            const expansionZoom = this.clusterIndex.getClusterExpansionZoom(feature.id);
+            this.map.setView([latitude, longitude], expansionZoom);
+          });
+        }
+        // Se for count = 1, ele será apenas um ícone de círculo sem ação de clique.
+        
+        this.markersLayer.addLayer(marker);
+      }
     },
 
-    // Função auxiliar para criar o ícone de círculo que você quer
     createClusterIcon(count) {
-      let size = 'small';
-      if (count >= 10 && count < 100) {
-        size = 'medium';
-      } else if (count >= 100) {
-        size = 'large';
-      }
-
-      // A classe principal é 'marker-cluster' e a secundária define o tamanho/cor
-      const className = `marker-cluster marker-cluster-${size}`;
-
+      let sizeClass = 'small';
+      if (count >= 10) sizeClass = 'medium'; // Mudado de > 100
+      if (count >= 100) sizeClass = 'large';  // Mudado de > 500
+      
+      const className = `marker-cluster marker-cluster-${sizeClass}`;
+      
       return L.divIcon({
         html: `<div><span>${count}</span></div>`,
-        className: className, // Usando a classe corrigida
+        className: className,
         iconSize: L.point(40, 40)
       });
     }
@@ -127,55 +299,102 @@ export default {
 </script>
 
 <style>
-/* Estilos principais para todos os clusters */
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+.map-filters-overlay {
+  position: absolute;
+  top: 10px;
+  left: 50px; /* Padrão do Leaflet para controles */
+  z-index: 1000; /* Acima do mapa */
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+}
+.filtro-grupo {
+  margin-bottom: 10px;
+}
+.filtro-grupo strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 1.1em;
+}
+.filtro-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.filtro-item label {
+  margin-right: 10px;
+}
+.filtro-item input[type="date"] {
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.filtro-item-radio {
+  margin-top: 5px;
+}
+.filtro-item-radio label {
+  margin-left: 5px;
+}
+.filtro-loading {
+  font-style: italic;
+  color: #555;
+}
+
 .marker-cluster {
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 50%; /* Garante um círculo perfeito */
+  border-radius: 50%;
   font-weight: bold;
   font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
   color: #000;
   width: 40px;
   height: 40px;
+  cursor: pointer; /* Indica que é clicável */
 }
-
-/*
-  O L.divIcon cria um ícone. Dentro dele, o nosso 'html' cria outra div.
-  Este estilo garante que essa div interna se comporte como um círculo.
-*/
 .marker-cluster div {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 32px; /* Ligeiramente menor para criar o efeito de borda */
+  width: 32px;
   height: 32px;
   border-radius: 50%;
 }
-
 .marker-cluster span {
-  line-height: 1; /* Alinha o texto verticalmente com flexbox */
+  line-height: 1;
 }
 
-/* Cores para os diferentes tamanhos de cluster */
 .marker-cluster-small {
-  background-color: rgba(181, 226, 140, 0.6);
+  background-color: rgba(253, 231, 37, 0.7); /* Amarelo */
 }
 .marker-cluster-small div {
-  background-color: rgba(110, 204, 57, 0.9);
+  background-color: rgba(253, 231, 37, 0.8);
 }
-
 .marker-cluster-medium {
-  background-color: rgba(241, 211, 87, 0.6);
+  background-color: rgba(240, 89, 34, 0.7); /* Laranja */
 }
 .marker-cluster-medium div {
-  background-color: rgba(240, 194, 12, 0.9);
+  background-color: rgba(240, 89, 34, 0.8);
 }
-
 .marker-cluster-large {
-  background-color: rgba(253, 156, 115, 0.6);
+  background-color: rgba(189, 0, 38, 0.7); /* Vermelho */
 }
 .marker-cluster-large div {
-  background-color: rgba(241, 128, 23, 0.9);
+  background-color: rgba(189, 0, 38, 0.8);
 }
 </style>
