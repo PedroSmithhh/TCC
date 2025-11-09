@@ -13,7 +13,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 src_path = Path(__file__).parent.parent
-model_path = src_path / "model" / "modelo_risco_viario.pkl"
+model_path = src_path / "model" / "modelo_risco_viario_final.pkl"
 
 app = FastAPI(
     title="API de Risco Viário",
@@ -23,7 +23,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ou ['http://localhost:8080'] para ser mais seguro
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],  # inclui OPTIONS, GET, POST etc
     allow_headers=["*"],
@@ -89,8 +89,8 @@ async def calcular_risco(features: InputFeatures):
             "mes": mes,
             "is_weekend": is_weekend,
             "hora": hora_int,
-            "Chuva": 1, # Valor padrão para teste
-            "tipo_via_num": 1, # Valor padrão para teste
+            "Chuva": 0, # Valor padrão para teste
+            "tipo_via_num": 0, # Valor padrão para teste
             "tp_veiculo_bicicleta": 0,
             "tp_veiculo_caminhao": 0,
             "tp_veiculo_motocicleta": 0,
