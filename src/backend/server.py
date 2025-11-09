@@ -89,7 +89,7 @@ async def calcular_risco(features: InputFeatures):
             "mes": mes,
             "is_weekend": is_weekend,
             "hora": hora_int,
-            "Chuva": 0, # Valor padrão para teste
+            "Chuva": 1, # Valor padrão para teste
             "tipo_via_num": 1, # Valor padrão para teste
             "tp_veiculo_bicicleta": 0,
             "tp_veiculo_caminhao": 0,
