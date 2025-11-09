@@ -47,7 +47,11 @@ export default {
         tp_veiculo_caminhao: "Caminhão",
         tp_veiculo_onibus: "Ônibus",
         tp_veiculo_outros: "Outros"
-      }
+      },
+      audioContext: null,
+      lastAlertAt: 0,
+      alertCooldownMs: 10000,
+      previousInterpretacao: null
     }
   },
   mounted() {
@@ -69,6 +73,15 @@ export default {
       this.tipoSelecionado = tipo
       this.mostrarSelecao = false
       this.monitorando = true
+
+      // inicializa o AudioContext no clique (necessário para tocar som)
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext
+        if (!this.audioContext && AudioContext) this.audioContext = new AudioContext()
+      } catch (e) {
+        console.error("Erro ao inicializar áudio:", e)
+      }
+
       this.iniciarGeolocalizacao()
     },
 
@@ -127,16 +140,15 @@ export default {
 
     async consultarRisco(lat, lng) {
       try {
-        // Cria payload simplificado que a nossa nova API espera
         const payload = {
-          latitude: lat, // Envia como NÚMERO
-          longitude: lng, // Envia como NÚMERO
-          tp_veiculo_selecionado: this.tipoSelecionado // Envia a STRING da chave do veículo
+          latitude: lat,
+          longitude: lng,
+          tp_veiculo_selecionado: this.tipoSelecionado
         }
         const res = await fetch(this.apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload) // Envia o novo payload simplificado
+          body: JSON.stringify(payload)
         })
 
         if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
@@ -147,6 +159,32 @@ export default {
       
       } catch (error) {
         console.error("Erro ao consultar risco:", error)
+      }
+    },
+
+    playAlertSound(duration = 0.5, frequency = 880) {
+      try {
+        if (!this.audioContext) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext
+          this.audioContext = new AudioContext()
+        }
+
+        const now = this.audioContext.currentTime
+        const osc = this.audioContext.createOscillator()
+        const gain = this.audioContext.createGain()
+
+        osc.type = "sine"
+        osc.frequency.setValueAtTime(frequency, now)
+        gain.gain.setValueAtTime(0, now)
+        gain.gain.linearRampToValueAtTime(0.9, now + 0.01)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+
+        osc.connect(gain)
+        gain.connect(this.audioContext.destination)
+        osc.start(now)
+        osc.stop(now + duration)
+      } catch (e) {
+        console.error("Erro ao tentar reproduzir som de alerta:", e)
       }
     },
 
@@ -164,6 +202,19 @@ export default {
           .bindPopup(`Risco estimado: <b>${interpretacao}</b> (${(risco * 100).toFixed(1)}%)`)
           .openPopup()
       }
+
+      // --- lógica do alerta sonoro ---
+      const now = Date.now()
+      const podeAlertar =
+        interpretacao === "ALTO" &&
+        (this.previousInterpretacao !== "ALTO" || now - this.lastAlertAt > this.alertCooldownMs)
+
+      if (podeAlertar) {
+        this.playAlertSound(0.6, 880)
+        this.lastAlertAt = now
+      }
+
+      this.previousInterpretacao = interpretacao
     }
   }
 }

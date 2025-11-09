@@ -18,7 +18,7 @@ model_path = src_path / "model" / "modelo_risco_viario_final.pkl"
 app = FastAPI(
     title="API de Risco Viário",
     description="API para previsão de risco de acidentes de trânsito com base em coordenadas geográficas.",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 app.add_middleware(
