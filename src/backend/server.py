@@ -13,7 +13,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 src_path = Path(__file__).parent.parent
-model_path = src_path / "model" / "modelo_risco_viario_final.pkl"
+model_path = src_path / "model" / "modelo_risco_viario_3.pkl"
 
 app = FastAPI(
     title="API de Risco Viário",
