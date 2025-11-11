@@ -149,7 +149,7 @@ async def calcular_risco(features: InputFeatures):
 
         if risco >= limiar:
             interpretacao = "ALTO"
-        elif risco >= 0.2:
+        elif risco >= 0.3:
             interpretacao = "MÉDIO"
         else:
             interpretacao = "BAIXO"
