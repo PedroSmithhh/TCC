@@ -118,7 +118,7 @@ async def calcular_risco(features: InputFeatures):
         prob = model.predict_proba(df_processed[model_features])[:, 1]
         risco = float(prob[0])
 
-        limiar = 0.45
+        limiar = 0.5
 
         if risco >= limiar:
             interpretacao = "ALTO"
