@@ -147,4 +147,3 @@ def healthcheck():
         "modelo_carregado": model is not None,
         "features_esperadas": len(model_features)
     }
-
