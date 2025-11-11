@@ -89,8 +89,6 @@ async def calcular_risco(features: InputFeatures):
             "mes": mes,
             "is_weekend": is_weekend,
             "hora": hora_int,
-            "Chuva": 0, # Valor padrão para teste
-            "tipo_via_num": 0, # Valor padrão para teste
             "tp_veiculo_bicicleta": 0,
             "tp_veiculo_caminhao": 0,
             "tp_veiculo_motocicleta": 0,
@@ -105,6 +103,7 @@ async def calcular_risco(features: InputFeatures):
             input_data[features.tp_veiculo_selecionado] = 1
 
         df_input = pd.DataFrame([input_data])
+        logging.info(f"Dados para predição: {df_input.to_dict()}")
 
         # Adiciona colunas que o modelo espera mas não vieram do input
         for col in model_features:
@@ -139,7 +138,7 @@ async def calcular_risco(features: InputFeatures):
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 # ============================
-# HEALTHCHECK (sem alterações)
+# HEALTHCHECK
 # ============================
 @app.get("/healthcheck")
 def healthcheck():
@@ -148,3 +147,4 @@ def healthcheck():
         "modelo_carregado": model is not None,
         "features_esperadas": len(model_features)
     }
+
