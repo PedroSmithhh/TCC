@@ -142,10 +142,8 @@ async def calcular_risco(features: InputFeatures):
         prob = model.predict_proba(df_processed[model_features])[:, 1]
         risco = float(prob[0])
 
-        # Lógica de limiar (mantida do server.py original)
+        # Lógica de limiar
         limiar = 0.5
-        # (Nota: o notebook RF usou 0.5, mas mantemos 0.45 
-        # para preservar a lógica da API antiga, como solicitado)
 
         if risco >= limiar:
             interpretacao = "ALTO"
